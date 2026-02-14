@@ -2,15 +2,16 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import asyncio
+import os
 from flask import Flask
 from threading import Thread
 
-# --- Keep Alive System ---
+# --- 1. Keep Alive System (For 24/7 Hosting) ---
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot is running!"
+    return "System Online - By BuWael"
 
 def run():
     app.run(host='0.0.0.0', port=8080)
@@ -19,9 +20,8 @@ def keep_alive():
     t = Thread(target=run)
     t.start()
 
-# --- Bot Configuration ---
-TOKEN = 'YOUR_BOT_TOKEN_HERE'
-OWNERS = [1389628859225473277]  # Replace with your ID
+# --- 2. Bot Configuration & Setup ---
+OWNERS = [1389628859225473277]  # Your ID
 
 class MyBot(commands.Bot):
     def __init__(self):
@@ -30,41 +30,41 @@ class MyBot(commands.Bot):
 
     async def setup_hook(self):
         await self.tree.sync()
-        print(f"Global Slash Commands Synced.")
+        print(f"✅ Global Slash Commands Synced.")
 
 bot = MyBot()
 
 @bot.event
 async def on_ready():
-    print(f'Logged in as {bot.user.name}')
+    print(f'Logged in as: {bot.user.name}')
     # Set Streaming status: By BuWael
     await bot.change_presence(
         activity=discord.Streaming(name="By BuWael", url="https://twitch.tv/HeiL")
     )
 
-# --- High-Speed Broadcast Logic ---
+# --- 3. High-Speed Broadcast Logic ---
 class BroadcastView(discord.ui.View):
-    def __init__(self, interaction, message_text):
+    def __init__(self, message_text):
         super().__init__(timeout=60)
         self.message_text = message_text
 
     async def fast_send(self, member):
-        """Helper function for individual high-speed sending."""
+        """Helper for high-speed sending with auto-mention."""
         if member.bot: return
         try:
-            # Auto-mention feature
-            await member.send(f"{self.message_text}\n{member.mention}")
+            # Auto-mention at the end of the message
+            await member.send(f"{self.message_text}\n\n{member.mention}")
             return True
         except:
             return False
 
     async def start_broadcast(self, interaction, member_list):
-        await interaction.response.send_message(f"🚀 **Initiating High-Speed Broadcast** to {len(member_list)} members...", ephemeral=True)
+        await interaction.response.send_message(f"🚀 **Starting Broadcast** to {len(member_list)} members...", ephemeral=True)
         
         success = 0
         failed = 0
         
-        # Process members in batches for speed
+        # Batch sending (5 at a time) for speed
         for i in range(0, len(member_list), 5): 
             batch = member_list[i:i+5]
             tasks = [self.fast_send(m) for m in batch]
@@ -73,12 +73,11 @@ class BroadcastView(discord.ui.View):
             success += results.count(True)
             failed += results.count(False)
             
-            # Small delay to prevent instant global rate limit
-            await asyncio.sleep(0.4) 
+            await asyncio.sleep(0.4) # Optimized delay
         
         await interaction.channel.send(
             f"✅ **Broadcast Completed**\n"
-            f"👤 **Target:** {len(member_list)}\n"
+            f"👤 **Total Target:** {len(member_list)}\n"
             f"🟢 **Success:** {success}\n"
             f"🔴 **Failed:** {failed}"
         )
@@ -101,31 +100,32 @@ class BroadcastView(discord.ui.View):
         await self.start_broadcast(interaction, members)
         self.stop()
 
-# --- Slash Command ---
-
-@bot.tree.command(name="bc", description="Send a high-speed broadcast message (No Cooldown)")
-@app_commands.describe(message="The message to broadcast")
+# --- 4. Slash Command (/bc) ---
+@bot.tree.command(name="bc", description="Send a high-speed broadcast message")
+@app_commands.describe(message="The message you want to broadcast")
 async def bc(interaction: discord.Interaction, message: str):
     if interaction.user.id not in OWNERS:
         return await interaction.response.send_message("❌ **Access Denied.**", ephemeral=True)
 
-    # Cooldown check removed as requested
-
     embed = discord.Embed(
         title="Broadcast Control Center",
-        description=f"**Message:** {message}\n\nSelect the target audience below:",
+        description=f"**Message to send:**\n{message}\n\nSelect the target audience:",
         color=0x2f3136
     )
     embed.set_footer(text="System by BuWael")
     
-    view = BroadcastView(interaction, message)
+    view = BroadcastView(message)
     await interaction.response.send_message(embed=embed, view=view)
 
-# Run Keep Alive
+# --- 5. Execution ---
 keep_alive()
 
-# Run Bot
 try:
-    bot.run(TOKEN)
+    # It will fetch the token from Render Environment Variables
+    TOKEN = os.getenv('DISCORD_TOKEN')
+    if TOKEN:
+        bot.run(TOKEN)
+    else:
+        print("❌ ERROR: 'DISCORD_TOKEN' not found in environment variables!")
 except Exception as e:
-    print(f"Error: {e}")
+    print(f"❌ Error starting the bot: {e}")
